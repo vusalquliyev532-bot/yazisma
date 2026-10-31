@@ -10,7 +10,7 @@ export default function Home() {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [pin, setPin] = useState("");
-  const [mode, setMode] = useState(null); // "new" | "existing" | null
+  const [mode, setMode] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -82,6 +82,10 @@ export default function Home() {
               onChange={(e) => setId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && checkId()}
               autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+              name="yazisma-id-field"
             />
             {err && <div className="error">{err}</div>}
             <button className="btn" onClick={checkId} disabled={loading}>
@@ -103,6 +107,8 @@ export default function Home() {
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              autoComplete="off"
+              name="yazisma-pin-field"
             />
             {err && <div className="error">{err}</div>}
             <button className="btn" onClick={handleLogin} disabled={loading}>
@@ -124,6 +130,8 @@ export default function Home() {
               placeholder="Adın"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              autoComplete="off"
+              name="yazisma-name-field"
             />
             <textarea
               className="field"
@@ -131,6 +139,8 @@ export default function Home() {
               rows={3}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
+              autoComplete="off"
+              name="yazisma-bio-field"
             />
             <input
               className="field mono"
@@ -139,6 +149,8 @@ export default function Home() {
               maxLength={4}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              autoComplete="off"
+              name="yazisma-newpin-field"
             />
             {err && <div className="error">{err}</div>}
             <button className="btn" onClick={handleRegister} disabled={loading}>
