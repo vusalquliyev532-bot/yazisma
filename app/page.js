@@ -4,13 +4,33 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 import { saveLocalProfile, getLocalProfile } from "../lib/identity";
 
+async function generateUniqueId() {
+  for (let i = 0; i < 8; i++) {
+    const candidate = String(Math.floor(1000000 + Math.random() * 9000000));
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", candidate)
+      .maybeSingle();
+    if (!data) return candidate;
+  }
+  throw new Error("id yaradıla bilmədi");
+}
+
 export default function Home() {
   const router = useRouter();
-  const [id, setId] = useState("");
+  const [tab, setTab] = useState("register");
+
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
-  const [pin, setPin] = useState("");
-  const [mode, setMode] = useState(null);
+  const [pass, setPass] = useState("");
+
+  const [loginId, setLoginId] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+
+  const [newId, setNewId] = useState(null);
+  const [copied, setCopied] = useState(false);
+
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,112 +39,93 @@ export default function Home() {
     if (existing) router.replace("/chat");
   }, [router]);
 
-  async function checkId() {
+  async function handleRegister() {
     setErr("");
-    const cleanId = id.trim().toLowerCase().replace(/\s+/g, "");
-    if (!cleanId) return setErr("ID daxil et.");
-    setId(cleanId);
+    if (!name.trim()) return setErr("Adını yaz.");
+    if (!/^\d{4,}$/.test(pass)) return setErr("Şifrə ən azı 4 rəqəmdən ibarət olmalıdır.");
     setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", cleanId)
-      .maybeSingle();
-    setLoading(false);
-    if (error) return setErr("Xəta baş verdi, yenidən cəhd et.");
-    setMode(data ? "existing" : "new");
+    try {
+      const id = await generateUniqueId();
+      const { data, error } = await supabase
+        .from("profiles")
+        .insert({ id, name: name.trim(), bio: bio.trim(), pin: pass })
+        .select()
+        .single();
+      setLoading(false);
+      if (error) return setErr("Xəta baş verdi, yenidən cəhd et.");
+      saveLocalProfile(data);
+      setNewId(data.id);
+    } catch {
+      setLoading(false);
+      setErr("Xəta baş verdi, yenidən cəhd et.");
+    }
   }
 
   async function handleLogin() {
     setErr("");
-    if (pin.length !== 4) return setErr("4 rəqəmli kodu daxil et.");
+    const cleanId = loginId.trim().replace(/\D/g, "");
+    if (cleanId.length !== 7) return setErr("7 rəqəmli ID daxil et.");
+    if (!loginPass) return setErr("Şifrəni daxil et.");
     setLoading(true);
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", id)
-      .eq("pin", pin)
+      .eq("id", cleanId)
+      .eq("pin", loginPass)
       .maybeSingle();
     setLoading(false);
-    if (error || !data) return setErr("ID və ya kod səhvdir.");
+    if (error || !data) return setErr("ID və ya şifrə səhvdir.");
     saveLocalProfile(data);
     router.replace("/chat");
   }
 
-  async function handleRegister() {
-    setErr("");
-    if (!name.trim()) return setErr("Adını yaz.");
-    if (pin.length !== 4) return setErr("4 rəqəmli kod seç (başqa cihazdan girmək üçün lazım olacaq).");
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .insert({ id, name: name.trim(), bio: bio.trim(), pin })
-      .select()
-      .single();
-    setLoading(false);
-    if (error) return setErr("Bu ID artıq götürülüb, başqasını sına.");
-    saveLocalProfile(data);
-    router.replace("/chat");
+  function copyId() {
+    navigator.clipboard?.writeText(newId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  if (newId) {
+    return (
+      <div className="screen pad">
+        <div style={{ marginTop: 48 }}>
+          <div className="title">Hazırsan</div>
+          <div className="subtitle">Bu sənin ID-ndir — başqa cihazdan girmək və ya tanışlarına özünü tapdırmaq üçün lazım olacaq. Unutma.</div>
+          <div className="id-reveal" onClick={copyId}>
+            <span className="mono">{newId}</span>
+            <span className="copy-hint">{copied ? "Kopyalandı" : "Toxun, kopyala"}</span>
+          </div>
+          <button className="btn" style={{ marginTop: 20 }} onClick={() => router.replace("/chat")}>
+            Davam et
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="screen pad">
       <div style={{ marginTop: 40 }}>
         <div className="title">Yazışma</div>
-        <div className="subtitle">Profil şəkli yoxdur — sadəcə ID, ad və bio.</div>
+        <div className="subtitle">Profil şəkli yoxdur — sadəcə ad, bio və şifrə.</div>
 
-        {mode === null && (
-          <>
-            <input
-              className="field mono"
-              placeholder="öz ID-ni seç (məs: vusal_c)"
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && checkId()}
-              autoCapitalize="none"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck="false"
-              name="yazisma-id-field"
-            />
-            {err && <div className="error">{err}</div>}
-            <button className="btn" onClick={checkId} disabled={loading}>
-              {loading ? "Yoxlanılır..." : "Davam et"}
-            </button>
-          </>
-        )}
+        <div className="tabs">
+          <button
+            className={`tab ${tab === "register" ? "active" : ""}`}
+            onClick={() => { setTab("register"); setErr(""); }}
+          >
+            Yeni profil
+          </button>
+          <button
+            className={`tab ${tab === "login" ? "active" : ""}`}
+            onClick={() => { setTab("login"); setErr(""); }}
+          >
+            Daxil ol
+          </button>
+        </div>
 
-        {mode === "existing" && (
+        {tab === "register" && (
           <>
-            <div className="subtitle">
-              <span className="mono">{id}</span> artıq var. Girmək üçün 4 rəqəmli kodunu daxil et.
-            </div>
-            <input
-              className="field mono"
-              placeholder="PIN (4 rəqəm)"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              autoComplete="off"
-              name="yazisma-pin-field"
-            />
-            {err && <div className="error">{err}</div>}
-            <button className="btn" onClick={handleLogin} disabled={loading}>
-              {loading ? "Daxil olunur..." : "Daxil ol"}
-            </button>
-            <button className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => { setMode(null); setErr(""); }}>
-              Geri
-            </button>
-          </>
-        )}
-
-        {mode === "new" && (
-          <>
-            <div className="subtitle">
-              <span className="mono">{id}</span> boşdur — yeni profil yarat.
-            </div>
             <input
               className="field"
               placeholder="Adın"
@@ -144,20 +145,45 @@ export default function Home() {
             />
             <input
               className="field mono"
-              placeholder="4 rəqəmli kod seç"
+              placeholder="Şifrə (ən azı 4 rəqəm)"
               inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              value={pass}
+              onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))}
               autoComplete="off"
-              name="yazisma-newpin-field"
+              name="yazisma-pass-field"
             />
             {err && <div className="error">{err}</div>}
             <button className="btn" onClick={handleRegister} disabled={loading}>
               {loading ? "Yaradılır..." : "Profili yarat"}
             </button>
-            <button className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => { setMode(null); setErr(""); }}>
-              Geri
+          </>
+        )}
+
+        {tab === "login" && (
+          <>
+            <input
+              className="field mono"
+              placeholder="7 rəqəmli ID"
+              inputMode="numeric"
+              maxLength={7}
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value.replace(/\D/g, ""))}
+              autoComplete="off"
+              name="yazisma-loginid-field"
+            />
+            <input
+              className="field mono"
+              placeholder="Şifrə"
+              inputMode="numeric"
+              value={loginPass}
+              onChange={(e) => setLoginPass(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              autoComplete="off"
+              name="yazisma-loginpass-field"
+            />
+            {err && <div className="error">{err}</div>}
+            <button className="btn" onClick={handleLogin} disabled={loading}>
+              {loading ? "Daxil olunur..." : "Daxil ol"}
             </button>
           </>
         )}
