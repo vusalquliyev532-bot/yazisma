@@ -1,0 +1,11 @@
+{
+  "name": "Yazışma",
+  "short_name": "Yazışma",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#1a1d22",
+  "theme_color": "#1a1d22",
+  "icons": [
+    { "src": "/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
