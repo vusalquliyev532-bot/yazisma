@@ -4,14 +4,13 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 import { saveLocalProfile, getLocalProfile } from "../lib/identity";
 
+const CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+
 async function generateUniqueId() {
   for (let i = 0; i < 8; i++) {
-    const candidate = String(Math.floor(1000000 + Math.random() * 9000000));
-    const { data } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", candidate)
-      .maybeSingle();
+    let candidate = "";
+    for (let j = 0; j < 7; j++) candidate += CHARS[Math.floor(Math.random() * CHARS.length)];
+    const { data } = await supabase.from("profiles").select("id").eq("id", candidate).maybeSingle();
     if (!data) return candidate;
   }
   throw new Error("id yaradıla bilmədi");
@@ -63,8 +62,8 @@ export default function Home() {
 
   async function handleLogin() {
     setErr("");
-    const cleanId = loginId.trim().replace(/\D/g, "");
-    if (cleanId.length !== 7) return setErr("7 rəqəmli ID daxil et.");
+    const cleanId = loginId.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cleanId.length !== 7) return setErr("7 simvoldan ibarət ID daxil et.");
     if (!loginPass) return setErr("Şifrəni daxil et.");
     setLoading(true);
     const { data, error } = await supabase
@@ -110,81 +109,26 @@ export default function Home() {
         <div className="subtitle">Profil şəkli yoxdur — sadəcə ad, bio və şifrə.</div>
 
         <div className="tabs">
-          <button
-            className={`tab ${tab === "register" ? "active" : ""}`}
-            onClick={() => { setTab("register"); setErr(""); }}
-          >
-            Yeni profil
-          </button>
-          <button
-            className={`tab ${tab === "login" ? "active" : ""}`}
-            onClick={() => { setTab("login"); setErr(""); }}
-          >
-            Daxil ol
-          </button>
+          <button className={`tab ${tab === "register" ? "active" : ""}`} onClick={() => { setTab("register"); setErr(""); }}>Yeni profil</button>
+          <button className={`tab ${tab === "login" ? "active" : ""}`} onClick={() => { setTab("login"); setErr(""); }}>Daxil ol</button>
         </div>
 
         {tab === "register" && (
           <>
-            <input
-              className="field"
-              placeholder="Adın"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="off"
-              name="yazisma-name-field"
-            />
-            <textarea
-              className="field"
-              placeholder="Bio (istəyə görə)"
-              rows={3}
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              autoComplete="off"
-              name="yazisma-bio-field"
-            />
-            <input
-              className="field mono"
-              placeholder="Şifrə (ən azı 4 rəqəm)"
-              inputMode="numeric"
-              value={pass}
-              onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))}
-              autoComplete="off"
-              name="yazisma-pass-field"
-            />
+            <input className="field" placeholder="Adın" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" name="yazisma-name-field" />
+            <textarea className="field" placeholder="Bio (istəyə görə)" rows={3} value={bio} onChange={(e) => setBio(e.target.value)} autoComplete="off" name="yazisma-bio-field" />
+            <input className="field mono" placeholder="Şifrə (ən azı 4 rəqəm)" inputMode="numeric" value={pass} onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))} autoComplete="off" name="yazisma-pass-field" />
             {err && <div className="error">{err}</div>}
-            <button className="btn" onClick={handleRegister} disabled={loading}>
-              {loading ? "Yaradılır..." : "Profili yarat"}
-            </button>
+            <button className="btn" onClick={handleRegister} disabled={loading}>{loading ? "Yaradılır..." : "Profili yarat"}</button>
           </>
         )}
 
         {tab === "login" && (
           <>
-            <input
-              className="field mono"
-              placeholder="7 rəqəmli ID"
-              inputMode="numeric"
-              maxLength={7}
-              value={loginId}
-              onChange={(e) => setLoginId(e.target.value.replace(/\D/g, ""))}
-              autoComplete="off"
-              name="yazisma-loginid-field"
-            />
-            <input
-              className="field mono"
-              placeholder="Şifrə"
-              inputMode="numeric"
-              value={loginPass}
-              onChange={(e) => setLoginPass(e.target.value.replace(/\D/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              autoComplete="off"
-              name="yazisma-loginpass-field"
-            />
+            <input className="field mono" placeholder="7 simvollu ID" maxLength={7} value={loginId} onChange={(e) => setLoginId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""))} autoComplete="off" name="yazisma-loginid-field" />
+            <input className="field mono" placeholder="Şifrə" inputMode="numeric" value={loginPass} onChange={(e) => setLoginPass(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && handleLogin()} autoComplete="off" name="yazisma-loginpass-field" />
             {err && <div className="error">{err}</div>}
-            <button className="btn" onClick={handleLogin} disabled={loading}>
-              {loading ? "Daxil olunur..." : "Daxil ol"}
-            </button>
+            <button className="btn" onClick={handleLogin} disabled={loading}>{loading ? "Daxil olunur..." : "Daxil ol"}</button>
           </>
         )}
       </div>
