@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
+import { uploadImage } from "../lib/upload";
 import { saveLocalProfile, getLocalProfile } from "../lib/identity";
 
 const CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -23,6 +24,8 @@ export default function Home() {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [pass, setPass] = useState("");
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   const [loginId, setLoginId] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -38,6 +41,13 @@ export default function Home() {
     if (existing) router.replace("/chat");
   }, [router]);
 
+  function handleAvatarPick(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+
   async function handleRegister() {
     setErr("");
     if (!name.trim()) return setErr("Adını yaz.");
@@ -45,9 +55,12 @@ export default function Home() {
     setLoading(true);
     try {
       const id = await generateUniqueId();
+      let avatar_url = null;
+      if (avatarFile) avatar_url = await uploadImage("avatars", avatarFile, id);
+
       const { data, error } = await supabase
         .from("profiles")
-        .insert({ id, name: name.trim(), bio: bio.trim(), pin: pass })
+        .insert({ id, name: name.trim(), bio: bio.trim(), pin: pass, avatar_url })
         .select()
         .single();
       setLoading(false);
@@ -94,9 +107,7 @@ export default function Home() {
             <span className="mono">{newId}</span>
             <span className="copy-hint">{copied ? "Kopyalandı" : "Toxun, kopyala"}</span>
           </div>
-          <button className="btn" style={{ marginTop: 20 }} onClick={() => router.replace("/chat")}>
-            Davam et
-          </button>
+          <button className="btn" style={{ marginTop: 20 }} onClick={() => router.replace("/chat")}>Davam et</button>
         </div>
       </div>
     );
@@ -106,7 +117,7 @@ export default function Home() {
     <div className="screen pad">
       <div style={{ marginTop: 40 }}>
         <div className="title">Yazışma</div>
-        <div className="subtitle">Profil şəkli yoxdur — sadəcə ad, bio və şifrə.</div>
+        <div className="subtitle">Ad, bio, şifrə — istəsən profil şəkli də.</div>
 
         <div className="tabs">
           <button className={`tab ${tab === "register" ? "active" : ""}`} onClick={() => { setTab("register"); setErr(""); }}>Yeni profil</button>
@@ -115,6 +126,16 @@ export default function Home() {
 
         {tab === "register" && (
           <>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+              <label className="avatar-picker">
+                {avatarPreview ? (
+                  <img src={avatarPreview} className="avatar-img-lg" />
+                ) : (
+                  <div className="avatar-letter avatar-lg">+</div>
+                )}
+                <input type="file" accept="image/*" hidden onChange={handleAvatarPick} />
+              </label>
+            </div>
             <input className="field" placeholder="Adın" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" name="yazisma-name-field" />
             <textarea className="field" placeholder="Bio (istəyə görə)" rows={3} value={bio} onChange={(e) => setBio(e.target.value)} autoComplete="off" name="yazisma-bio-field" />
             <input className="field mono" placeholder="Şifrə (ən azı 4 rəqəm)" inputMode="numeric" value={pass} onChange={(e) => setPass(e.target.value.replace(/\D/g, ""))} autoComplete="off" name="yazisma-pass-field" />

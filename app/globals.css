@@ -206,3 +206,63 @@ input, button, textarea {
 .title { letter-spacing: -0.01em; }
 .btn { transition: transform 0.08s ease, background 0.15s ease; }
 .btn:active { transform: scale(0.98); }
+
+.avatar-img {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+}
+.avatar-img-lg {
+  width: 88px; height: 88px; border-radius: 50%; object-fit: cover;
+}
+.avatar-lg { width: 88px; height: 88px; font-size: 1.8rem; }
+.avatar-picker { cursor: pointer; display: inline-block; }
+
+.composer-icon-btn {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  width: 44px;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.sticker-panel {
+  border-top: 1px solid var(--line);
+  padding: 10px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.sticker-add {
+  aspect-ratio: 1;
+  background: var(--paper-raised);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+.sticker-thumb {
+  aspect-ratio: 1;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.sticker-empty {
+  grid-column: span 4;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 10px;
+}
+
+.sticker-msg { display: flex; max-width: 50%; }
+.sticker-msg.mine { align-self: flex-end; }
+.sticker-msg.theirs { align-self: flex-start; }
+.bubble-sticker { width: 100%; border-radius: 12px; }

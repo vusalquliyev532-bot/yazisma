@@ -19,10 +19,9 @@ export default function ChatHome() {
 
   async function loadConvos(myId) {
     setLoading(true);
-
     const { data: dmMsgs } = await supabase
       .from("messages")
-      .select("from_id, to_id, content, created_at")
+      .select("from_id, to_id, content, type, created_at")
       .is("group_id", null)
       .or(`from_id.eq.${myId},to_id.eq.${myId}`)
       .order("created_at", { ascending: false });
@@ -31,21 +30,18 @@ export default function ChatHome() {
     (dmMsgs || []).forEach((m) => {
       const otherId = m.from_id === myId ? m.to_id : m.from_id;
       if (!otherId) return;
-      if (!dmMap.has(otherId)) dmMap.set(otherId, { lastContent: m.content, lastTime: m.created_at });
+      if (!dmMap.has(otherId)) dmMap.set(otherId, { lastContent: m.type === "sticker" ? "Stiker" : m.content, lastTime: m.created_at });
     });
 
     const otherIds = [...dmMap.keys()];
     let profiles = [];
     if (otherIds.length) {
-      const { data } = await supabase.from("profiles").select("id,name").in("id", otherIds);
+      const { data } = await supabase.from("profiles").select("id,name,avatar_url").in("id", otherIds);
       profiles = data || [];
     }
     const dmItems = profiles.map((p) => ({
-      type: "dm",
-      id: p.id,
-      title: p.name,
-      subtitle: dmMap.get(p.id).lastContent,
-      time: dmMap.get(p.id).lastTime,
+      type: "dm", id: p.id, title: p.name, avatar: p.avatar_url,
+      subtitle: dmMap.get(p.id).lastContent, time: dmMap.get(p.id).lastTime,
     }));
 
     const { data: memberRows } = await supabase
@@ -59,16 +55,14 @@ export default function ChatHome() {
       if (!g) continue;
       const { data: lastMsg } = await supabase
         .from("messages")
-        .select("content, created_at")
+        .select("content, type, created_at")
         .eq("group_id", g.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       groupItems.push({
-        type: "group",
-        id: g.id,
-        title: g.name,
-        subtitle: lastMsg ? lastMsg.content : "Hələ mesaj yoxdur",
+        type: "group", id: g.id, title: g.name, avatar: null,
+        subtitle: lastMsg ? (lastMsg.type === "sticker" ? "Stiker" : lastMsg.content) : "Hələ mesaj yoxdur",
         time: lastMsg ? lastMsg.created_at : null,
       });
     }
@@ -78,7 +72,6 @@ export default function ChatHome() {
       if (!b.time) return -1;
       return new Date(b.time) - new Date(a.time);
     });
-
     setConvos(all);
     setLoading(false);
   }
@@ -93,7 +86,8 @@ export default function ChatHome() {
   return (
     <div className="screen">
       <div className="topbar">
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10 }} onClick={() => router.push("/chat/profile")}>
+          {me.avatar_url ? <img src={me.avatar_url} className="avatar-img" /> : <div className="avatar-letter">{me.name.charAt(0).toUpperCase()}</div>}
           <div className="name-row">
             <strong>{me.name}</strong>
             <span className="id-tag mono">@{me.id}</span>
@@ -112,7 +106,7 @@ export default function ChatHome() {
         {!loading && convos.length === 0 && <div className="empty">Hələ söhbətin yoxdur. "+ Yeni söhbət" ilə başla.</div>}
         {convos.map((c) => (
           <div key={c.type + c.id} className="list-item" onClick={() => router.push(c.type === "group" ? `/chat/group/${c.id}` : `/chat/${c.id}`)}>
-            <div className="avatar-letter">{c.type === "group" ? "G" : c.title.charAt(0).toUpperCase()}</div>
+            {c.avatar ? <img src={c.avatar} className="avatar-img" /> : <div className="avatar-letter">{c.type === "group" ? "G" : c.title.charAt(0).toUpperCase()}</div>}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="name-row">
                 <strong>{c.title}</strong>

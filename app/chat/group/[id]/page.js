@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "../../../../lib/supabaseClient";
 import { getLocalProfile } from "../../../../lib/identity";
+import StickerPicker from "../../../../components/StickerPicker";
 
 export default function GroupRoom() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function GroupRoom() {
   const [messages, setMessages] = useState([]);
   const [names, setNames] = useState({});
   const [text, setText] = useState("");
+  const [showStickers, setShowStickers] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -42,14 +44,8 @@ export default function GroupRoom() {
   async function init(myId) {
     const { data: g } = await supabase.from("groups").select("*").eq("id", groupId).maybeSingle();
     setGroup(g);
-
-    const { data: history } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("group_id", groupId)
-      .order("created_at", { ascending: true });
+    const { data: history } = await supabase.from("messages").select("*").eq("group_id", groupId).order("created_at", { ascending: true });
     setMessages(history || []);
-
     const ids = [...new Set((history || []).map((m) => m.from_id))];
     if (ids.length) {
       const { data: profs } = await supabase.from("profiles").select("id, name").in("id", ids);
@@ -69,11 +65,17 @@ export default function GroupRoom() {
     });
   }
 
-  async function send() {
+  async function sendText() {
     const content = text.trim();
     if (!content || !me) return;
     setText("");
-    await supabase.from("messages").insert({ from_id: me.id, group_id: groupId, content });
+    await supabase.from("messages").insert({ from_id: me.id, group_id: groupId, content, type: "text" });
+  }
+
+  async function sendSticker(url) {
+    if (!me) return;
+    setShowStickers(false);
+    await supabase.from("messages").insert({ from_id: me.id, group_id: groupId, content: "", type: "sticker", sticker_url: url });
   }
 
   if (!me) return null;
@@ -87,19 +89,20 @@ export default function GroupRoom() {
 
       <div className="msg-area">
         {messages.map((m) => (
-          <div key={m.id} className={`bubble ${m.from_id === me.id ? "mine" : "theirs"}`}>
-            {m.from_id !== me.id && (
-              <div style={{ fontSize: "0.75rem", color: "var(--accent)", marginBottom: 2 }}>{names[m.from_id] || m.from_id}</div>
-            )}
-            {m.content}
+          <div key={m.id} className={m.type === "sticker" ? `sticker-msg ${m.from_id === me.id ? "mine" : "theirs"}` : `bubble ${m.from_id === me.id ? "mine" : "theirs"}`}>
+            {m.from_id !== me.id && <div style={{ fontSize: "0.75rem", color: "var(--accent)", marginBottom: 2 }}>{names[m.from_id] || m.from_id}</div>}
+            {m.type === "sticker" ? <img src={m.sticker_url} className="bubble-sticker" /> : m.content}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
+      {showStickers && <StickerPicker me={me} onSelect={sendSticker} />}
+
       <div className="composer">
-        <input className="field" style={{ marginBottom: 0 }} placeholder="Mesaj yaz..." value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-        <button className="btn" onClick={send}>Göndər</button>
+        <button className="composer-icon-btn" onClick={() => setShowStickers((v) => !v)}>😊</button>
+        <input className="field" style={{ marginBottom: 0 }} placeholder="Mesaj yaz..." value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendText()} />
+        <button className="btn" onClick={sendText}>Göndər</button>
       </div>
     </div>
   );

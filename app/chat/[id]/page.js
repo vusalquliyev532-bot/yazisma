@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 import { getLocalProfile } from "../../../lib/identity";
+import StickerPicker from "../../../components/StickerPicker";
 
 export default function ChatRoom() {
   const router = useRouter();
@@ -13,67 +14,53 @@ export default function ChatRoom() {
   const [other, setOther] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [showStickers, setShowStickers] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     const profile = getLocalProfile();
-    if (!profile) {
-      router.replace("/");
-      return;
-    }
+    if (!profile) { router.replace("/"); return; }
     setMe(profile);
     init(profile.id);
 
     const channel = supabase
       .channel(`room-${[profile.id, otherId].sort().join("-")}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const m = payload.new;
-          const belongs =
-            (m.from_id === profile.id && m.to_id === otherId) ||
-            (m.from_id === otherId && m.to_id === profile.id);
-          if (belongs) setMessages((prev) => [...prev, m]);
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const m = payload.new;
+        const belongs = (m.from_id === profile.id && m.to_id === otherId) || (m.from_id === otherId && m.to_id === profile.id);
+        if (belongs) setMessages((prev) => [...prev, m]);
+      })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otherId, router]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   async function init(myId) {
-    const { data: otherProfile } = await supabase
-      .from("profiles")
-      .select("id, name, bio")
-      .eq("id", otherId)
-      .maybeSingle();
+    const { data: otherProfile } = await supabase.from("profiles").select("id, name, bio, avatar_url").eq("id", otherId).maybeSingle();
     setOther(otherProfile);
 
     const { data: history } = await supabase
       .from("messages")
       .select("*")
-      .or(
-        `and(from_id.eq.${myId},to_id.eq.${otherId}),and(from_id.eq.${otherId},to_id.eq.${myId})`
-      )
+      .or(`and(from_id.eq.${myId},to_id.eq.${otherId}),and(from_id.eq.${otherId},to_id.eq.${myId})`)
       .order("created_at", { ascending: true });
     setMessages(history || []);
   }
 
-  async function send() {
+  async function sendText() {
     const content = text.trim();
     if (!content || !me) return;
     setText("");
-    await supabase.from("messages").insert({
-      from_id: me.id,
-      to_id: otherId,
-      content,
-    });
+    await supabase.from("messages").insert({ from_id: me.id, to_id: otherId, content, type: "text" });
+  }
+
+  async function sendSticker(url) {
+    if (!me) return;
+    setShowStickers(false);
+    await supabase.from("messages").insert({ from_id: me.id, to_id: otherId, content: "", type: "sticker", sticker_url: url });
   }
 
   if (!me) return null;
@@ -81,13 +68,8 @@ export default function ChatRoom() {
   return (
     <div className="screen">
       <div className="topbar">
-        <button
-          className="btn-ghost"
-          style={{ width: "auto", padding: "6px 10px", borderRadius: 8 }}
-          onClick={() => router.push("/chat")}
-        >
-          ←
-        </button>
+        <button className="btn-ghost" style={{ width: "auto", padding: "6px 10px", borderRadius: 8 }} onClick={() => router.push("/chat")}>←</button>
+        {other?.avatar_url ? <img src={other.avatar_url} className="avatar-img" /> : <div className="avatar-letter">{(other?.name || otherId).charAt(0).toUpperCase()}</div>}
         <div>
           <div className="name-row">
             <strong>{other?.name || otherId}</strong>
@@ -99,25 +81,23 @@ export default function ChatRoom() {
 
       <div className="msg-area">
         {messages.map((m) => (
-          <div key={m.id} className={`bubble ${m.from_id === me.id ? "mine" : "theirs"}`}>
-            {m.content}
-          </div>
+          m.type === "sticker" ? (
+            <div key={m.id} className={`sticker-msg ${m.from_id === me.id ? "mine" : "theirs"}`}>
+              <img src={m.sticker_url} className="bubble-sticker" />
+            </div>
+          ) : (
+            <div key={m.id} className={`bubble ${m.from_id === me.id ? "mine" : "theirs"}`}>{m.content}</div>
+          )
         ))}
         <div ref={bottomRef} />
       </div>
 
+      {showStickers && <StickerPicker me={me} onSelect={sendSticker} />}
+
       <div className="composer">
-        <input
-          className="field"
-          style={{ marginBottom: 0 }}
-          placeholder="Mesaj yaz..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-        />
-        <button className="btn" onClick={send}>
-          Göndər
-        </button>
+        <button className="composer-icon-btn" onClick={() => setShowStickers((v) => !v)}>😊</button>
+        <input className="field" style={{ marginBottom: 0 }} placeholder="Mesaj yaz..." value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendText()} />
+        <button className="btn" onClick={sendText}>Göndər</button>
       </div>
     </div>
   );
